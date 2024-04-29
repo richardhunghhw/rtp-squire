@@ -42,6 +42,6 @@
     // "remoteUser": "root",
     // See https://code.visualstudio.com/remote/advancedcontainers/add-local-file-mount
     "mounts": [
-        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,consistency=cached,readonly"
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly"
     ]
 }
