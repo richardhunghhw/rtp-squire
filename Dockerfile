@@ -9,6 +9,10 @@ COPY . ./
 # Install python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Setup environment variables
+ENV ENV=prod
+ENV GS_SERVICE_ACCOUNT_FILE=${APP_HOME}/creds.json
+
 # Run the application
 ENTRYPOINT [ "python3" ]
 CMD ["main.py"]

@@ -1,6 +1,7 @@
 import os.path
 
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -16,7 +17,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 class SheetsOB:
     GS_ORDER_REF_COL = 11
     
-    def __init__(self, id, sheet):
+    def __init__(self, id, sheet, service_account_file=None, user_token_file=None, user_secret_file=None):
         """
         Initialize the SheetsOB class
         """
@@ -24,30 +25,34 @@ class SheetsOB:
             raise ValueError("ID is required")
         if (sheet is None):
             raise ValueError("Sheet is required")
+        if (service_account_file is None and user_secret_file is None):
+            raise ValueError("Service account file or user secret file is required")
         
         self.ID=id
         self.SHEET=sheet
         
-        # The file token.json stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first
-        # time.
-        if os.path.exists("token.json"):
-            self.CREDS = Credentials.from_authorized_user_file("token.json", SCOPES)
+        # Get credentials from service account file or user token file
+        creds = None
+        if service_account_file is not None and os.path.exists(service_account_file):
+            creds = service_account.Credentials.from_service_account_file(service_account_file, SCOPES)
+        if user_token_file is not None and os.path.exists(user_token_file):
+            creds = Credentials.from_authorized_user_file(user_token_file, SCOPES)
+        
         # If there are no (valid) credentials available, let the user log in.
-        if not self.CREDS or not self.CREDS.valid:
-            if self.CREDS and self.CREDS.expired and self.CREDS.refresh_token:
-                self.CREDS.refresh(Request())
+        if (not creds or not creds.valid) and user_secret_file is not None and os.path.exists(user_secret_file):
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    "credentials.json", SCOPES
+                    user_secret_file, SCOPES
                 )
-                self.CREDS = flow.run_local_server(port=0)
+                creds = flow.run_local_server(port=0)
                 # Save the credentials for the next run
-                with open("token.json", "w") as token:
-                    token.write(self.CREDS.to_json())
+                with open(user_token_file, "w") as token:
+                    token.write(creds.to_json())
                     
         # Initialize the service
-        self.SERVICE = build("sheets", "v4", credentials=self.CREDS)
+        self.SERVICE = build("sheets", "v4", credentials=creds)
         
         # Initialize the cache
         self.CACHE = None

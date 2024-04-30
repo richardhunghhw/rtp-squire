@@ -26,7 +26,10 @@ class Main:
         # Initialize the Google Sheets API
         ss_id=os.getenv("GS_SS_ID")
         sheet_name=os.getenv("GS_SHEET_NAME")
-        self.SHEETS = SheetsOB(ss_id, sheet_name)
+        service_account_file=os.getenv("GS_SERVICE_ACCOUNT_FILE")
+        user_token_file=os.getenv("GS_USER_TOKEN_FILE")
+        user_secret_file=os.getenv("GS_USER_SECRET_FILE")
+        self.SHEETS = SheetsOB(ss_id, sheet_name, service_account_file, user_token_file, user_secret_file)
         
         # Initialize jobs
         self.JOBS = []
