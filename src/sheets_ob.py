@@ -34,7 +34,7 @@ class SheetsOB:
         # Get credentials from service account file or user token file
         creds = None
         if service_account_file is not None and os.path.exists(service_account_file):
-            creds = service_account.Credentials.from_service_account_file(service_account_file, SCOPES)
+            creds = service_account.Credentials.from_service_account_file(service_account_file)
         if user_token_file is not None and os.path.exists(user_token_file):
             creds = Credentials.from_authorized_user_file(user_token_file, SCOPES)
         
