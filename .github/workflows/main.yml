@@ -29,4 +29,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:main
