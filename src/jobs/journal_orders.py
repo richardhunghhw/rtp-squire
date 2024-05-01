@@ -39,10 +39,9 @@ class JournalOrders:
         """
         if (entries is None):
             raise ValueError("Entries are required")
-        logger.info("Processing entries...")
         
         for entry in entries: 
-            logger.info("Processing entry [" + entry["id"] + "] with order references [" + str(entry["order-references"]) + "]")
+            logger.info("Processing entry [" + entry["id"] + "] with [" + str(len(entry["order-references"])) + "] order references")
 
             # Query the Google Sheets API to get rows with matching Order References
             entry["orders"] = self.SHEETS.get_rows_with_order_references(entry["order-references"])

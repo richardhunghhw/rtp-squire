@@ -20,8 +20,8 @@ class Main:
         """
         # Initialize the Notion API
         token=os.getenv("NOTION_TOKEN")
-        database_id=os.getenv("NOTION_DATABASE_ID")
-        self.NOTION = NotionJournal(token, database_id)
+        journal_database_id=os.getenv("NOTION_JOURNAL_DATABASE_ID")
+        self.NOTION = NotionJournal(token, journal_database_id)
         
         # Initialize the Google Sheets API
         ss_id=os.getenv("GS_SS_ID")
