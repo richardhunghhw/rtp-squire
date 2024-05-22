@@ -3,7 +3,7 @@ import csv
 import pytest
 
 from dotenv import load_dotenv
-from src.notion_journal import NotionJournal
+from src.services.notion_journal import NotionJournal
 
 load_dotenv()
 

@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from src.sheets_ob import SheetsOB
+from src.services.sheets_ob import SheetsOB
 
 load_dotenv()
 
@@ -8,9 +8,16 @@ class TestSheetsOB:
     def setup_method(self, method):
         id=os.getenv("GS_SS_ID")
         sheet=os.getenv("GS_SHEET_NAME")
-        self.sheets = SheetsOB(id, sheet)
+        user_token_file="./token.json"
+        user_secret_file="./credentials.json"
+        self.sheets = SheetsOB(id, sheet, None, user_token_file, user_secret_file)
     
     def test_query_sheets(self):
-        response = self.sheets.get_rows_with_order_references(["32913432101"])
+        response = self.sheets.get_rows_with_order_references(["-"])
+        print(response)
+        assert False
+        
+    def test_get_rows_pending_refresh(self):
+        response = self.sheets.get_rows_pending_rtps_refresh()
         print(response)
         assert False

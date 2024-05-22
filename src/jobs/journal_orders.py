@@ -1,10 +1,13 @@
 from notion_client import APIResponseError
+
 from src.logger_config import setup_logger
+from src.services.notion_journal import NotionJournal
+from src.services.sheets_ob import SheetsOB
 
 logger = setup_logger(__name__)
 
 class JournalOrders:
-    def __init__(self, notion, sheets):
+    def __init__(self, notion: NotionJournal, sheets: SheetsOB):
         """
         Initialize the JournalOrders class
         """
@@ -41,35 +44,41 @@ class JournalOrders:
             raise ValueError("Entries are required")
         
         for entry in entries: 
-            logger.info("Processing entry [" + entry["id"] + "] with [" + str(len(entry["order-references"])) + "] order references")
+            try:
+                self.process_entry(entry)
+            except Exception as err:
+                logger.error("Failed to process entry [" + entry["id"] + "] with error [" + str(err) + "], ignoring and continuing...")
+            
+    def process_entry(self, entry):
+        logger.info("Processing entry [" + entry["id"] + "] with [" + str(len(entry["order-references"])) + "] order references")
 
-            # Query the Google Sheets API to get rows with matching Order References
-            entry["orders"] = self.SHEETS.get_rows_with_order_references(entry["order-references"])
-            
-            # Delete exisiting table block if it exists
-            if (entry["table-block-id"]):
-                try: 
-                    self.NOTION.delete_block(entry["table-block-id"])
-                except APIResponseError as err:
-                    logger.error("Failed to delete table block [" + entry["table-block-id"] + "] with error [" + str(err) + "], ignoring and creating a new block...")
-            entry["table-block-id"] = None
-            
-            # Sum the columns Effect, Total (inc. Fees)
-            effect = 0
-            total = 0
-            for order in entry["orders"][1:]:
-                effect += float(order[6].replace(',', ''))
-                total += float(order[7].replace(',', ''))
-            entry["orders"].append(["", "", "", "", "", "Net:", str(round(effect, 2)), str(round(total, 2)), "", "", "", "", ""])
-            
-            # Create a new table block with the orders
-            if (entry["orders"]):
-                entry["table-block-id"] = self.NOTION.create_orders_table_block(entry["id"], entry["orders"])
-            else:
-                logger.warning("No orders found for entry [" + entry["id"] + "]")
-            
-            # Update the entry with the new table block id
-            self.NOTION.update_entry_table_block_id(entry["id"], entry["table-block-id"])
-            
-            # Remove the refresh-orders tag
-            self.NOTION.remove_refresh_orders_tag(entry["id"])
+        # Query the Google Sheets API to get rows with matching Order References
+        entry["orders"] = self.SHEETS.get_rows_with_order_references(entry["order-references"])
+        
+        # Delete exisiting table block if it exists
+        if (entry["table-block-id"]):
+            try: 
+                self.NOTION.delete_block(entry["table-block-id"])
+            except APIResponseError as err:
+                logger.error("Failed to delete table block [" + entry["table-block-id"] + "] with error [" + str(err) + "], ignoring and creating a new block...")
+        entry["table-block-id"] = None
+        
+        # Sum the columns Effect, Total (inc. Fees)
+        effect = 0
+        total = 0
+        for order in entry["orders"][1:]:
+            effect += float(order[6].replace(',', ''))
+            total += float(order[7].replace(',', ''))
+        entry["orders"].append(["", "", "", "", "", "Net:", str(round(effect, 2)), str(round(total, 2)), "", "", "", "", ""])
+        
+        # Create a new table block with the orders
+        if (entry["orders"]):
+            entry["table-block-id"] = self.NOTION.create_orders_table_block(entry["id"], entry["orders"])
+        else:
+            logger.warning("No orders found for entry [" + entry["id"] + "]")
+        
+        # Update the entry with the new table block id
+        self.NOTION.update_entry_table_block_id(entry["id"], entry["table-block-id"])
+        
+        # Remove the refresh-orders tag
+        self.NOTION.remove_refresh_orders_tag(entry["id"])

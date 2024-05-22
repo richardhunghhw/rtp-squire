@@ -4,8 +4,10 @@ from dotenv import load_dotenv
 
 from src.logger_config import setup_logger
 from src.jobs.journal_orders import JournalOrders
-from src.notion_journal import NotionJournal
-from src.sheets_ob import SheetsOB
+from src.jobs.order_book import OrderBook
+from src.services.binance_exchange import BinanceExchange
+from src.services.notion_journal import NotionJournal
+from src.services.sheets_ob import SheetsOB
 
 logger = setup_logger(__name__)
 
@@ -31,18 +33,24 @@ class Main:
         user_secret_file=os.getenv("GS_USER_SECRET_FILE")
         self.SHEETS = SheetsOB(ss_id, sheet_name, service_account_file, user_token_file, user_secret_file)
         
+        # Initialize exchange APIs
+        exchanges = {}
+        exchanges[os.getenv("BINANCE_1_NAME")] = BinanceExchange(os.getenv("BINANCE_1_NAME"), os.getenv("BINANCE_1_API_KEY"), os.getenv("BINANCE_1_API_SECRET"))
+        exchanges[os.getenv("BINANCE_2_NAME")] = BinanceExchange(os.getenv("BINANCE_2_NAME"), os.getenv("BINANCE_2_API_KEY"), os.getenv("BINANCE_2_API_SECRET"))
+        
         # Initialize jobs
         self.JOBS = []
+        self.JOBS.append(OrderBook(self.SHEETS, exchanges))
         self.JOBS.append(JournalOrders(self.NOTION, self.SHEETS))
 
     def run(self):
-        logger.info("Running RTP Squire to the moon!")
+        logger.info("Launching RTP Squire!")
         
         # Run the Journal Orders job
         for job in self.JOBS:
             job.run()
         
-        logger.info("Done running RTP Squire to the moon!")
+        logger.info("Launched RTP Squire to the moon!")
 
 
 if __name__ == "__main__":
