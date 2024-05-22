@@ -118,7 +118,7 @@ class SheetsOB:
             
         # Check if there are missing order references    
         if (len(res) < len(order_references)):
-            logger.warning("Missing [" + str(len(order_references) - len(res)) + "> order references")
+            logger.warning("Missing [" + str(len(order_references) - len(res)) + "] order references")
             # Add missing order references with empty values
             for order_ref in order_references:
                 if not any(row[self.GS_COLUMN_MAPPING["REFERENCE"]] == order_ref for row in res):
