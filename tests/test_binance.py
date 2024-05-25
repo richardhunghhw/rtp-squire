@@ -8,9 +8,10 @@ load_dotenv()
 
 class TestBinance:
     def setup_method(self, method):
+        name="Binance"
         key=os.getenv("BINANCE_1_API_KEY")
         secret=os.getenv("BINANCE_1_API_SECRET")
-        self.binance = BinanceExchange(key, secret)
+        self.binance = BinanceExchange(name, key, secret)
     
     @pytest.mark.skip(reason="For manual testing only")
     def test_query_spot_order(self):

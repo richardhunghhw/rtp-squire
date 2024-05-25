@@ -82,20 +82,22 @@ class OrderBook:
         if (order.get("code") is not None):
             raise ValueError("Failed to fetch order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "] with code [" + str(order.get("code")) + "] and error [" + order["msg"] + "]")
         
-        # Check if the order is FILLED or PARTIALLY_FILLED status 
-        if (order["status"] != "FILLED" and order["status"] != "PARTIALLY_FILLED"):
-            logger.warning("Order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "] is not FILLED or PARTIALLY_FILLED, skipping...")
+        # Check if the order has FILLED, PARTIALLY_FILLED, CANCELLED status 
+        if (order["status"] not in ["FILLED", "PARTIALLY_FILLED", "CANCELLED"]):
+            logger.warning("Order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "] has status [" + str(order["status"]) + "] which is not accecpted, skipping...")
             return None
         
         # Create a new order object as per the Google Sheets schema
         timestamp = order.get("updateTime")
         date = datetime.fromtimestamp(timestamp / 1000)  # Convert epoch time to seconds
         formatted_date = date.strftime("%d/%m/%Y")
+        executed_qty = float(order.get("executedQty"))
+        average_price = float(order.get("cummulativeQuoteQty")) / executed_qty
         return {
             "DATE": formatted_date,
             "BUY_SELL": order.get("side").capitalize(),
-            "AVERAGE": float(order.get("price")),
-            "EXECUTED": float(order.get("executedQty")),
+            "AVERAGE": average_price,
+            "EXECUTED": executed_qty,
             "RTPS_REFRESH": "COMPLETED"
         }
         
