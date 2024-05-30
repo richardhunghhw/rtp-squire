@@ -48,6 +48,10 @@ class JournalOrders:
                 self.process_entry(entry)
             except Exception as err:
                 logger.error("Failed to process entry [" + entry["id"] + "] with error [" + str(err) + "], ignoring and continuing...")
+                try: 
+                    self.NOTION.add_unknown_error_tag(entry["id"], entry["action-tags"])
+                except APIResponseError as err:
+                    logger.error("Failed to add failed orders tag to entry [" + entry["id"] + "] with error [" + str(err) + "], ignoring and continuing...")
             
     def process_entry(self, entry):
         logger.info("Processing entry [" + entry["id"] + "] with [" + str(len(entry["order-references"])) + "] order references")
@@ -66,9 +70,13 @@ class JournalOrders:
         # Sum the columns Effect, Total (inc. Fees)
         effect = 0
         total = 0
+        missing = False
         for order in entry["orders"][1:]:
-            effect += float(order[6].replace(',', ''))
-            total += float(order[7].replace(',', ''))
+            if order[6] is not None and order[6] != "" and order[7] is not None and order[7] != "":
+                effect += float(order[6].replace(',', ''))
+                total += float(order[7].replace(',', ''))
+            else:
+                missing = True
         entry["orders"].append(["", "", "", "", "", "Net:", str(round(effect, 2)), str(round(total, 2)), "", "", "", "", ""])
         
         # Create a new table block with the orders
@@ -81,4 +89,9 @@ class JournalOrders:
         self.NOTION.update_entry_table_block_id(entry["id"], entry["table-block-id"])
         
         # Remove the refresh-orders tag
+        tags = [tag["name"] for tag in entry["action-tags"]]
+        print(tags)
         self.NOTION.remove_refresh_orders_tag(entry["id"])
+        # Add a missing orders tag if any orders are missing
+        if (missing):
+            self.NOTION.add_missing_orders_tag(entry["id"])

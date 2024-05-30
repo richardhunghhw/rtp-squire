@@ -48,7 +48,7 @@ class NotionJournal:
             if order_references:
                 res.append({
                     "id": entry["id"],
-                    "order-references": order_references[0]["plain_text"].split(","),
+                    "order-references": list(filter(None, order_references[0]["plain_text"].split(","))),
                     "table-block-id": table_block_id[0]["plain_text"],
                     "action-tags": entry["properties"][self.NP_TAGS]["multi_select"]
                 })
@@ -257,7 +257,7 @@ class NotionJournal:
         
         tags = [tag for tag in exisiting_tags if tag["name"] != "refresh-orders"]
         
-        res = self.CLIENT.pages.update(
+        self.CLIENT.pages.update(
             **{
                 "page_id": entry_id,
                 "properties": {
@@ -268,5 +268,48 @@ class NotionJournal:
             }
         )
         
-        return res
+        return tags
+    
+    def add_missing_orders_tag(self, entry_id, exisiting_tags=[]):
+        if (entry_id is None):
+            raise ValueError("Entry ID is required")
         
+        tags = exisiting_tags
+        tags.append({
+            "name": "missing-orders"
+        })
+        
+        self.CLIENT.pages.update(
+            **{
+                "page_id": entry_id,
+                "properties": {
+                    self.NP_TAGS: {
+                        "multi_select": tags
+                    }
+                }
+            }
+        )
+        
+        return tags
+    
+    def add_unknown_error_tag(self, entry_id, exisiting_tags=[]):
+        if (entry_id is None):
+            raise ValueError("Entry ID is required")
+        
+        tags = exisiting_tags
+        tags.append({
+            "name": "unknown-error"
+        })
+        
+        self.CLIENT.pages.update(
+            **{
+                "page_id": entry_id,
+                "properties": {
+                    self.NP_TAGS: {
+                        "multi_select": tags
+                    }
+                }
+            }
+        )
+        
+        return tags
