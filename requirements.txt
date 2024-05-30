@@ -4,5 +4,5 @@ notion-client==2.2.1
 google-api-python-client==2.127.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0
-pandas==2.2.2
 requests==2.32.2
+pymexc==1.0.11

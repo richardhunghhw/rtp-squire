@@ -31,20 +31,24 @@ class SheetsOB:
         "NOTES": 12,
         "RTPS_REFRESH": 13
     }
+    NO_BREAK_STRING = "*=*=*=*=*"
     
-    def __init__(self, id, sheet_name, service_account_file=None, user_token_file=None, user_secret_file=None):
+    def __init__(self, id, ob_sheet_name, neworders_sheet_name, service_account_file=None, user_token_file=None, user_secret_file=None):
         """
         Initialize the SheetsOB class
         """
         if (id is None):
             raise ValueError("ID is required")
-        if (sheet_name is None):
-            raise ValueError("Sheet is required")
+        if (ob_sheet_name is None):
+            raise ValueError("Order Book Sheet is required")
+        if (neworders_sheet_name is None):
+            raise ValueError("New Orders Sheet is required")
         if (service_account_file is None and user_secret_file is None):
             raise ValueError("Service account file or user secret file is required")
         
         self.ID=id
-        self.SHEET_NAME=sheet_name
+        self.OB_SHEET_NAME=ob_sheet_name
+        self.NEWORDERS_SHEET_NAME=neworders_sheet_name
         
         # Get credentials from service account file or user token file
         creds = None
@@ -70,18 +74,21 @@ class SheetsOB:
         self.SERVICE = build("sheets", "v4", credentials=creds)
         
         # Initialize the cache
-        self.CACHE = None
+        self.CACHE: dict[str, list[list]] = {}
     
-    def populate_cache(self):
+    def populate_cache(self, sheet_name=None):
         """
-        Populate the cache
+        Populate the cache for sheet_name
         """
-        logger.info("Populating Google Sheets cache...")
+        if (sheet_name is None):
+            sheet_name = self.OB_SHEET_NAME
+        
+        logger.info("Populating Google Sheets cache for sheet [" + sheet_name + "]")
         try:
             sheet = self.SERVICE.spreadsheets()
             result = (
                 sheet.values()
-                .get(spreadsheetId=self.ID, range=self.SHEET_NAME)
+                .get(spreadsheetId=self.ID, range=sheet_name)
                 .execute()
             )
             values = result.get("values", [])
@@ -90,8 +97,8 @@ class SheetsOB:
                 print("No data found.")
                 return None
             
-            self.CACHE = values
-            logger.info("Successfully populated Google Sheets cache with [" + str(len(self.CACHE)) + "] rows")
+            self.CACHE[sheet_name] = values
+            logger.info("Successfully populated Google Sheets cache with [" + str(len(self.CACHE[sheet_name])) + "] rows")
         except HttpError as err:
             logger.error(err)
             return None
@@ -104,14 +111,14 @@ class SheetsOB:
             raise ValueError("Order references are required")
         logger.info("Getting rows from Google Sheets with order references [" + str(order_references) + "]")
         
-        if (self.CACHE is None):
-            self.populate_cache()
+        if (self.OB_SHEET_NAME not in self.CACHE or self.CACHE[self.OB_SHEET_NAME] is None):
+            self.populate_cache(self.OB_SHEET_NAME)
             
         # Initialise res with headers
-        res = [self.CACHE[0]]
+        res = [self.CACHE[self.OB_SHEET_NAME][0]]
         
         # Filter rows with matching order references
-        for row in self.CACHE[1:]:
+        for row in self.CACHE[self.OB_SHEET_NAME][1:]:
             if len(row) > self.GS_COLUMN_MAPPING["REFERENCE"] and row[self.GS_COLUMN_MAPPING["REFERENCE"]] in order_references:
                 res.append(row)
         logger.info("Found [" + str(len(res)) + "] rows with matching order references")
@@ -137,13 +144,11 @@ class SheetsOB:
         Returns a list of row_number, account, pair, reference
         """
         logger.info("Getting rows from Google Sheets pending RTPS Refresh")
-        
-        if (self.CACHE is None):
-            self.populate_cache()
+        self.populate_cache()
             
         # Filter rows with value True in the `RTPS Refresh` column
         res = []
-        for idx, row in enumerate(self.CACHE[1:], start=2):
+        for idx, row in enumerate(self.CACHE[self.OB_SHEET_NAME][1:], start=2):
             if len(row) > self.GS_COLUMN_MAPPING["RTPS_REFRESH"] and row[self.GS_COLUMN_MAPPING["RTPS_REFRESH"]] == "TRUE":
                 res.append([idx, row[self.GS_COLUMN_MAPPING["ACCOUNT"]], row[self.GS_COLUMN_MAPPING["PAIR"]], row[self.GS_COLUMN_MAPPING["REFERENCE"]]])
         

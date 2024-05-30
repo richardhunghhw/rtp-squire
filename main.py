@@ -6,6 +6,7 @@ from src.logger_config import setup_logger
 from src.jobs.journal_orders import JournalOrders
 from src.jobs.order_book import OrderBook
 from src.services.binance_exchange import BinanceExchange
+from src.services.mexc_exchange import MexcExchange
 from src.services.notion_journal import NotionJournal
 from src.services.sheets_ob import SheetsOB
 
@@ -27,16 +28,23 @@ class Main:
         
         # Initialize the Google Sheets API
         ss_id=os.getenv("GS_SS_ID")
-        sheet_name=os.getenv("GS_SHEET_NAME")
+        ob_sheet_name=os.getenv("GS_OB_SHEET_NAME")
+        neworders_sheet_name=os.getenv("GS_NEWORDERS_SHEET_NAME")
         service_account_file=os.getenv("GS_SERVICE_ACCOUNT_FILE")
         user_token_file=os.getenv("GS_USER_TOKEN_FILE")
         user_secret_file=os.getenv("GS_USER_SECRET_FILE")
-        self.SHEETS = SheetsOB(ss_id, sheet_name, service_account_file, user_token_file, user_secret_file)
+        self.SHEETS = SheetsOB(ss_id, ob_sheet_name, neworders_sheet_name, service_account_file, user_token_file, user_secret_file)
         
         # Initialize exchange APIs
         exchanges = {}
-        exchanges[os.getenv("BINANCE_1_NAME")] = BinanceExchange(os.getenv("BINANCE_1_NAME"), os.getenv("BINANCE_1_API_KEY"), os.getenv("BINANCE_1_API_SECRET"))
-        exchanges[os.getenv("BINANCE_2_NAME")] = BinanceExchange(os.getenv("BINANCE_2_NAME"), os.getenv("BINANCE_2_API_KEY"), os.getenv("BINANCE_2_API_SECRET"))
+        # Binance, may have more than one account
+        binance_names = os.getenv("BINANCE_NAME").split(",")
+        binance_keys = os.getenv("BINANCE_API_KEY").split(",")
+        binance_secrets = os.getenv("BINANCE_API_SECRET").split(",")
+        for idx in range(len(binance_names)):
+            exchanges[binance_names[idx]] = BinanceExchange(binance_names[idx], binance_keys[idx], binance_secrets[idx])
+        # Mexc
+        exchanges[os.getenv("MEXC_NAME")] = MexcExchange(os.getenv("MEXC_NAME"), os.getenv("MEXC_API_KEY"), os.getenv("MEXC_API_SECRET"))
         
         # Initialize jobs
         self.JOBS = []

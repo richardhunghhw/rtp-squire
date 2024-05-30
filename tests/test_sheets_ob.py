@@ -7,7 +7,8 @@ load_dotenv()
 class TestSheetsOB:
     def setup_method(self, method):
         id=os.getenv("GS_SS_ID")
-        sheet=os.getenv("GS_SHEET_NAME")
+        ob_sheet=os.getenv("GS_OB_SHEET_NAME")
+        no_sheet=os.getenv("GS_NEWORDERS_SHEET_NAME")
         user_token_file="./token.json"
         user_secret_file="./credentials.json"
         self.sheets = SheetsOB(id, sheet, None, user_token_file, user_secret_file)

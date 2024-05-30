@@ -1,8 +1,9 @@
 from datetime import datetime
 
 from src.logger_config import setup_logger
-from src.services.exchange import Exchange
+from src.services.exchange import Exchange, Order
 from src.services.sheets_ob import SheetsOB
+from src.helper import get_exchange_type
 
 logger = setup_logger(__name__)
 
@@ -47,6 +48,11 @@ class OrderBook:
         Process rows, error handling 
         """
         logger.info("Processing [" + str(len(rows)) + "] rows")
+        
+        if (rows is None or len(rows) == 0):
+            logger.info("No rows to process")
+            return
+        
         for row in rows:
             # Get the sheets updated row
             order_row = None
@@ -76,31 +82,25 @@ class OrderBook:
         logger.info("Processing row with account [" + account + "], pair [" + pair + "], order reference [" + order_reference + "]")
         
         # Fetch the order from the corresponding exchange
-        order = self.fetch_order(account, pair, order_reference)
-        if (order is None):
-            raise ValueError("Failed to fetch order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "]")
-        if (order.get("code") is not None):
-            raise ValueError("Failed to fetch order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "] with code [" + str(order.get("code")) + "] and error [" + order["msg"] + "]")
+        order: Order = self.fetch_order(account, pair, order_reference)
         
-        # Check if the order has FILLED, PARTIALLY_FILLED, CANCELLED status 
-        if (order["status"] not in ["FILLED", "PARTIALLY_FILLED", "CANCELLED"]):
-            logger.warning("Order for account [" + str(account) + "], pair [" + str(pair) + "], order reference [" + str(order_reference) + "] has status [" + str(order["status"]) + "] which is not accecpted, skipping...")
+        # If the fetch_order returns None, the order is being skipped for some reason, ignore, do not update the Google Sheets row
+        if (order is None):
             return None
         
         # Create a new order object as per the Google Sheets schema
-        timestamp = order.get("updateTime")
-        date = datetime.fromtimestamp(timestamp / 1000)  # Convert epoch time to seconds
-        formatted_date = date.strftime("%d/%m/%Y")
-        executed_qty = float(order.get("executedQty"))
-        average_price = float(order.get("cummulativeQuoteQty")) / executed_qty
-        return {
+        formatted_date = order["datetime"].strftime("%d/%m/%Y")
+        res = {
             "DATE": formatted_date,
-            "BUY_SELL": order.get("side").capitalize(),
-            "AVERAGE": average_price,
-            "EXECUTED": executed_qty,
+            "BUY_SELL": order["side"],
+            "AVERAGE": order["average"],
+            "EXECUTED": order["executed"],
             "RTPS_REFRESH": "COMPLETED"
         }
-        
+        if (order["fee"] is not None and order["fee_currency"] is not None):
+            res["FEE"] = order["fee"]
+            res["FEE_CURRENCY"] = order["fee_currency"]
+        return res
         
     def fetch_order(self, account, pair, order_reference):
         """
@@ -108,42 +108,21 @@ class OrderBook:
         """
         logger.debug("Fetching order for account [" + account + "], pair [" + pair + "], order reference [" + order_reference + "]")
         
-        # Determine the exchange
-        exchange = self.get_exchange(account)
-        type = self.get_type(account)
-        if (exchange is None):
-            logger.error("Failed to determine exchange for account [" + account + "]")
-            return None
-        
-        # Format the pair to the exchange pair
-        pair = exchange.format_pair(pair)
+        # Determine the exchange, type
+        exchange: Exchange
+        type: str
+        exchange, type = get_exchange_type(account, self.EXCHANGES)
+        if (exchange is None or type is None):
+            raise Exception("Failed to determine exchange or type for account [" + account + "]")
         
         # Query the exchange for the order
         order = None
         if (type == "Spot"):
             order = exchange.query_spot_order(pair, order_reference)
-        elif (type == "Margin"):
-            order = exchange.query_margin_order(pair, order_reference)
+        elif (type in ["Margin", "Futures"]):
+            order = exchange.query_leverage_order(pair, order_reference)
         else:
             logger.error("Failed to determine type for account [" + account + "]")
         
         return order
     
-    def get_exchange(self, account: str) -> Exchange:
-        """
-        Get the exchange
-        [BINANCE_NAME> <TYPE>]
-        """        
-        # Determine the exchange
-        for exchange in self.EXCHANGES:
-            if account.startswith(exchange):
-                return self.EXCHANGES[exchange]
-        
-        return None
-    
-    def get_type(self, account: str) -> str:
-        """
-        Get the type
-        [BINANCE_NAME> <TYPE>]
-        """
-        return account.split(" ")[2]
