@@ -4,7 +4,6 @@ import requests
 import hmac
 import hashlib
 
-from src.helper import get_rounded_time
 from src.logger_config import setup_logger
 from src.services.exchange import Exchange, Order
 
@@ -49,14 +48,14 @@ class MexcExchange(Exchange):
         Make a request to the Mexc API
         """
         timestamp = str(int(time.time() * 1000))
+        if params is not None:
+            params["timestamp"] = timestamp
         headers = {
             "ApiKey": self.api_key,
             "Request-Time": timestamp,
             "Signature": self.get_signature(timestamp, params),
             "Content-Type": "application/json",
         }
-        if params is not None:
-            params["timestamp"] = timestamp
         
         logger.debug("Making a [" + method + "] request to [" + url + "] with params [" + str(params) + "] and payload [" + str(payload) + "]")
         
@@ -102,7 +101,6 @@ class MexcExchange(Exchange):
             "orderId": orderId,
         }
         api_order = self.request("GET", url, params=params)
-        print(api_order)
         
         # Check Error
         if "code" not in api_order or api_order["code"] != 0:
@@ -111,7 +109,7 @@ class MexcExchange(Exchange):
         
         return self.parse_order(api_order)
             
-    def get_all_spot_orders_from(self, start_time: int = None) -> list[Order]:
+    def get_all_spot_orders_from(self, start_time: int) -> list[Order]:
         """
         Get all spot orders from the exchange from the start time
         """
@@ -138,28 +136,34 @@ class MexcExchange(Exchange):
         
         return self.parse_order(api_order["data"])
     
-    def get_all_leverage_orders_from(self, start_time: int = None) -> list[Order]:
+    def get_all_leverage_orders_from(self, start_time: int) -> list[Order]:
         """
         Get all futures orders from the exchange from the start time
         """
-        # Check if the start time is None
-        if (start_time is None):
-            start_time = get_rounded_time()
+        endpoint = "/api/v1/private/order/list/history_orders"
+        url = self.FUTURES_BASE_URL + endpoint
         
-        logger.info("Getting all futures orders starting from [" + str(start_time) + "]")
+        logger.debug("Getting all futures orders starting from [" + str(start_time) + "]")
         
-        # Get all orders
-        api_orders = self.futures_client.history_orders(start_time=start_time)
+        # Query Mexc
+        params = {
+            "page_num": 1,
+            "page_size": 100,
+            "start_time": start_time,
+        }
+        api_orders = self.request("GET", url, params=params)
+        
+        # Check Error
         if "code" not in api_orders or api_orders["code"] != 0:
-            logger.error("Failed to fetch orders with error [" + api_orders["message"] + "]")
-            return None
-        if api_orders is None or "data" not in api_orders or "resultList" not in api_orders["data"]:
-            logger.info("No futures orders found since [" + str(start_time) + "]")
+            logger.error("Failed to fetch futures historical orders with code [" + str(api_orders["code"]) + "] and error [" + api_orders["message"] + "]")
             return None
         
         # Parse the orders
         orders = []
-        for order in api_orders["data"]["resultList"]:
+        if "data" not in api_orders or len(api_orders["data"]) == 0:
+            logger.debug("No futures orders found since [" + str(start_time) + "]")
+            return None
+        for order in api_orders["data"]:
             # Ignore order state 1, 4, and 5
             # Order state: 1 uninformed, 2 uncompleted, 3 completed, 4 cancelled, 5 invalid; multiple separate by ','
             if order["state"] in [1, 4, 5]:
@@ -167,5 +171,5 @@ class MexcExchange(Exchange):
             
             orders.append(self.parse_order(order))
         
-        logger.info("Found [" + str(len(orders)) + "] futures orders since [" + str(start_time) + "]")
+        logger.debug("Found [" + str(len(orders)) + "] futures orders since [" + str(start_time) + "]")
         return orders

@@ -13,7 +13,7 @@ class TestMexc:
         secret=os.getenv("MEXC_API_SECRET")
         self.mexc = MexcExchange(name, key, secret)
     
-    # @pytest.mark.skip(reason="For manual testing only")
+    @pytest.mark.skip(reason="For manual testing only")
     def test_query_spot_order(self):
         symbol = "ETH/USDT"
         orderId = "-"
@@ -26,7 +26,7 @@ class TestMexc:
         # print(res)
         # assert False
     
-    # @pytest.mark.skip(reason="For manual testing only")
+    @pytest.mark.skip(reason="For manual testing only")
     def test_query_leverage_order(self):
         symbol = "BTC/USDT"
         orderId = "-"

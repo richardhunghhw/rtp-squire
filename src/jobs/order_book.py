@@ -66,7 +66,7 @@ class OrderBook:
                 
             # Update the Google Sheets row with the order
             if (order_row is not None):
-                self.SHEETS.update_row(row[0], order_row)
+                self.SHEETS.update_ob_row(row[0], order_row)
         
     def process_row(self, row):
         """

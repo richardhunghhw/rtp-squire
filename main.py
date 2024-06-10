@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
+from src.jobs.new_orders import NewOrders
 from src.logger_config import setup_logger
 from src.jobs.journal_orders import JournalOrders
 from src.jobs.order_book import OrderBook
@@ -48,6 +49,7 @@ class Main:
         
         # Initialize jobs
         self.JOBS = []
+        self.JOBS.append(NewOrders(self.SHEETS, exchanges))
         self.JOBS.append(OrderBook(self.SHEETS, exchanges))
         self.JOBS.append(JournalOrders(self.NOTION, self.SHEETS))
 

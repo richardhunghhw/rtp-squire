@@ -1,3 +1,4 @@
+from datetime import datetime
 import os.path
 
 from google.auth.transport.requests import Request
@@ -8,6 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from src.logger_config import setup_logger
+from src.services.exchange import Order
 
 logger = setup_logger(__name__)
 
@@ -94,7 +96,7 @@ class SheetsOB:
             values = result.get("values", [])
             
             if not values:
-                print("No data found.")
+                logger.info("No data found.")
                 return None
             
             self.CACHE[sheet_name] = values
@@ -129,7 +131,7 @@ class SheetsOB:
             # Add missing order references with empty values
             for order_ref in order_references:
                 if not any(row[self.GS_COLUMN_MAPPING["REFERENCE"]] == order_ref for row in res):
-                    res.append([None] * 12)
+                    res.append(["", "", "", "", "", "", "", "", "", "", "", order_ref, ""])
         
         # Ensure each row has 13 columns, if not add empty values
         for row in res:
@@ -154,7 +156,7 @@ class SheetsOB:
         
         return res
     
-    def update_row(self, row_number: int, row: list[str]):
+    def update_ob_row(self, row_number: int, row: list[str]):
         """
         Update the Google Sheets row, updating only the columns with values
         """
@@ -193,3 +195,149 @@ class SheetsOB:
         except HttpError as err:
             logger.error(err)
             return None
+    
+    def update_new_orders(self, account_orders: dict[str, list[Order]]):
+        """
+        Update the New Orders sheet with new orders
+        """
+        if (account_orders is None):
+            raise ValueError("Account orders is required")
+        
+        logger.info(f"Updating Google Sheets with [{sum([len(v) for v in account_orders.values()])}] rows of new orders")
+        
+        # Check if the cache is populated, this should not be necessary
+        if (self.NEWORDERS_SHEET_NAME not in self.CACHE or self.CACHE[self.NEWORDERS_SHEET_NAME] is None):
+            self.populate_cache(self.NEWORDERS_SHEET_NAME)
+        
+        # Find the NO_BREAK_STRING row
+        no_break_row = None
+        for idx, row in enumerate(self.CACHE[self.NEWORDERS_SHEET_NAME]):
+            if row is not None and len(row) > 0:
+                if row[0] == self.NO_BREAK_STRING:
+                    no_break_row = idx + 1
+                    break
+                
+        if (no_break_row is None):
+            logger.error("No breaker row found in Google Sheets! Not updating new orders")
+            return None
+        
+        # Construct the new orders list
+        data = [["Account", "Symbol", "Last Updated", "Side", "Average", "Executed", "Fee", "Fee Currency", "Order ID"]]
+        for account, orders in account_orders.items():
+            for order in orders:
+                data.append([
+                    account,
+                    order["symbol"],
+                    order["datetime"].strftime("%d/%m/%Y %H:%M:%S"), 
+                    order["side"],
+                    order["average"],
+                    order["executed"],
+                    order["fee"],
+                    order["fee_currency"],
+                    order["order_id"],
+                ])
+        
+        # Add the new orders to the Google Sheets
+        row_number = no_break_row + 1
+        self.add_new_order_rows(data, row_number)
+    
+    def add_new_order_rows(self, orders: list[Order], start_row_number: int):
+        """
+        Add new order rows to the New Orders sheet
+        """
+        if (orders is None):
+            raise ValueError("Order is required")
+        if (start_row_number is None):
+            raise ValueError("Row number is required")
+        
+        if (len(orders) == 0):
+            logger.debug("No new orders to add")
+            return None
+        logger.debug("Adding new orders to Google Sheets starting from row [" + str(start_row_number) + "] with [" + str(len(orders)) + "] orders")
+
+        try:
+            sheet = self.SERVICE.spreadsheets()
+            (
+                sheet.values()
+                .update(
+                    spreadsheetId=self.ID,
+                    range=self.NEWORDERS_SHEET_NAME + "!A" + str(start_row_number),
+                    valueInputOption="USER_ENTERED",
+                    body={"values": orders}
+                )
+                .execute()
+            )
+            logger.debug("Successfully added orders to Google Sheets")
+        except HttpError as err:
+            logger.error(err)
+            return None
+    
+    def convert_str_to_datetime(self, date_str):
+        """
+        Convert a date string to datetime
+        """
+        if (date_str is None):
+            return None
+        
+    def get_no_last_updated(self) -> dict[str, datetime]:
+        """
+        Get the last updated time from the new orders sheet
+        """
+        
+        if (self.NEWORDERS_SHEET_NAME not in self.CACHE or self.CACHE[self.NEWORDERS_SHEET_NAME] is None):
+            self.populate_cache(self.NEWORDERS_SHEET_NAME)
+        
+        logger.info("Getting last updated time from Google Sheets")
+        
+        res = {}
+        for row in self.CACHE[self.NEWORDERS_SHEET_NAME]:
+            if row is not None and len(row) > 0:
+                if row[0] == self.NO_BREAK_STRING:
+                    return res
+                
+                if row[0] == "Account" or row[1] == "Deactivated":
+                    continue
+                
+                res[row[0]] = row[1] if len(row) > 1 else None
+    
+    def clear_no_from_breaker(self):
+        """
+        Clear all rows on New Orders Sheet from the breaker row
+        """
+        logger.info("Clearing New Orders sheet")
+        
+        # Check if the cache is populated, this should not be necessary
+        if (self.NEWORDERS_SHEET_NAME not in self.CACHE or self.CACHE[self.NEWORDERS_SHEET_NAME] is None):
+            self.populate_cache(self.NEWORDERS_SHEET_NAME)
+        
+        # Clear the NO_BREAK_STRING from the breaker row
+        for idx, row in enumerate(self.CACHE[self.NEWORDERS_SHEET_NAME]):
+            if row is not None and len(row) > 0:
+                if row[0] == self.NO_BREAK_STRING:
+                    self.clear_no_rows_from(idx+3)
+    
+    def clear_no_rows_from(self, row_number):
+        """
+        Clear all rows on New Orders Sheet from the row_number
+        """
+        if (row_number is None):
+            raise ValueError("Row number is required")
+        
+        # Get the last column and row
+        last_col = chr(65 + len(self.CACHE[self.NEWORDERS_SHEET_NAME][0]))
+        last_row = len(self.CACHE[self.NEWORDERS_SHEET_NAME])
+        range = self.NEWORDERS_SHEET_NAME + "!A" + str(row_number) + ":" + last_col + str(last_row)
+        
+        logger.info("Clearing New Orders sheet cells range [" + range + "]")
+        
+        # Clear all rows from the row_number
+        sheet = self.SERVICE.spreadsheets()
+        (
+            sheet.values()
+            .clear(
+                spreadsheetId=self.ID,
+                range=range,
+                body={}
+            )
+            .execute()
+        )

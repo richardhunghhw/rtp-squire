@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from datetime import datetime as dt
 from typing import Literal, NotRequired, TypedDict
 
@@ -13,7 +13,7 @@ class Order(TypedDict):
     fee_currency: NotRequired[str]
 
 class Exchange(ABC):
-    def query_spot_order(self, symbol, orderId) -> Order:
+    def query_spot_order(self, symbol: str, orderId: str) -> Order:
         """
         Query a spot account order
         """
@@ -25,7 +25,7 @@ class Exchange(ABC):
         """
         pass
     
-    def query_leverage_order(self, symbol, orderId) -> Order:
+    def query_leverage_order(self, symbol: str, orderId: str) -> Order:
         """
         Query a leveraged (margin, futures) order
         """
