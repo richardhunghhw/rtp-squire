@@ -222,13 +222,13 @@ class SheetsOB:
             return None
         
         # Construct the new orders list
-        data = [["Account", "Symbol", "Last Updated", "Side", "Average", "Executed", "Fee", "Fee Currency", "Order ID"]]
+        data = [["Last Updated", "Account", "Symbol", "Side", "Average", "Executed", "Fee", "Fee Currency", "Order ID"]]
         for account, orders in account_orders.items():
             for order in orders:
                 data.append([
+                    order["datetime"].strftime("%d/%m/%Y %H:%M:%S"), 
                     account,
                     order["symbol"],
-                    order["datetime"].strftime("%d/%m/%Y %H:%M:%S"), 
                     order["side"],
                     order["average"],
                     order["executed"],
