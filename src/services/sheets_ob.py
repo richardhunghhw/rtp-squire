@@ -169,7 +169,7 @@ class SheetsOB:
         
         data = []
         for key, value in row.items():
-            if value is not None:                
+            if value is not None:
                 column = self.GS_COLUMN_MAPPING[key]
                 range_str = 'Crypto Book!' + chr(65 + column) + str(row_number) + ':' + chr(65 + column) + str(row_number)
                 data.append({

@@ -9,7 +9,7 @@ logger = setup_logger(__name__)
 
 class OrderBook:
     """
-    Automates the population of the order book using order references
+    Automates the population of the google sheets order book using order references
     """
     def __init__(self, sheets: SheetsOB, exchanges: list[Exchange]):
         """
@@ -98,8 +98,8 @@ class OrderBook:
             "RTPS_REFRESH": "COMPLETED"
         }
         if (order["fee"] is not None and order["fee_currency"] is not None):
-            res["FEE"] = order["fee"]
-            res["FEE_CURRENCY"] = order["fee_currency"]
+            res["FEES"] = order["fee"]
+            res["FEES_CURRENCY"] = order["fee_currency"]
         return res
         
     def fetch_order(self, account, pair, order_reference):
