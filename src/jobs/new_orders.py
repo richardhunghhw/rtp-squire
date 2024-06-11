@@ -37,8 +37,11 @@ class NewOrders:
         account_orders = {}
         for account in last_updated.keys():
             try: 
-                # Convert 27/05/2024 00:00:00 to datetime
-                timestamp = dt.strptime(last_updated[account], "%d/%m/%Y %H:%M:%S")
+                timestamp: dt = None
+                if (last_updated[account] is not None):
+                    # Convert 27/05/2024 00:00:00 to datetime
+                    timestamp = dt.strptime(last_updated[account], "%d/%m/%Y %H:%M:%S")
+                
                 orders = self.run_for_account(account, timestamp)
 
                 if (orders is None or len(orders) == 0):
@@ -69,7 +72,7 @@ class NewOrders:
         exchange, type = get_exchange_type(account, self.EXCHANGES)
         
         # Check if the start time is None
-        start_time = int((get_rounded_time() if last_updated is None else last_updated).timestamp() * 1000)
+        start_time = get_rounded_time() if last_updated is None else int((last_updated).timestamp() * 1000)
         
         # Get all orders from the exchange
         if type == "Spot":

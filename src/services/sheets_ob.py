@@ -295,7 +295,7 @@ class SheetsOB:
                 if row[0] == self.NO_BREAK_STRING:
                     return res
                 
-                if row[0] == "Account" or row[1] == "Deactivated":
+                if row[0] == "Account" or (len(row) > 1 and row[1] == "Deactivated"):
                     continue
                 
                 res[row[0]] = row[1] if len(row) > 1 else None
