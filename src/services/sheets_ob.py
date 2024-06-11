@@ -8,6 +8,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from src.helper import dt_to_str
 from src.logger_config import setup_logger
 from src.services.exchange import Order
 
@@ -158,7 +159,7 @@ class SheetsOB:
     
     def update_ob_row(self, row_number: int, row: list[str]):
         """
-        Update the Google Sheets row, updating only the columns with values
+        Update the Google Sheets row for the OB, updating only the columns with values
         """
         if (row_number is None):
             raise ValueError("Row number is required")
@@ -171,7 +172,7 @@ class SheetsOB:
         for key, value in row.items():
             if value is not None:
                 column = self.GS_COLUMN_MAPPING[key]
-                range_str = 'Crypto Book!' + chr(65 + column) + str(row_number) + ':' + chr(65 + column) + str(row_number)
+                range_str = self.OB_SHEET_NAME + '!' + chr(65 + column) + str(row_number) + ':' + chr(65 + column) + str(row_number)
                 data.append({
                     "range": range_str,
                     "majorDimension": "ROWS",
@@ -221,12 +222,16 @@ class SheetsOB:
             logger.error("No breaker row found in Google Sheets! Not updating new orders")
             return None
         
+        # Clear the New Orders sheet from the breaker row
+        row_number = no_break_row + 1
+        self.clear_no_rows_from(row_number)
+        
         # Construct the new orders list
         data = [["Last Updated", "Account", "Symbol", "Side", "Average", "Executed", "Fee", "Fee Currency", "Order ID"]]
         for account, orders in account_orders.items():
             for order in orders:
                 data.append([
-                    order["datetime"].strftime("%d/%m/%Y %H:%M:%S"), 
+                    dt_to_str(order["datetime"]), 
                     account,
                     order["symbol"],
                     order["side"],
@@ -238,7 +243,6 @@ class SheetsOB:
                 ])
         
         # Add the new orders to the Google Sheets
-        row_number = no_break_row + 1
         self.add_new_order_rows(data, row_number)
     
     def add_new_order_rows(self, orders: list[Order], start_row_number: int):
@@ -253,7 +257,7 @@ class SheetsOB:
         if (len(orders) == 0):
             logger.debug("No new orders to add")
             return None
-        logger.debug("Adding new orders to Google Sheets starting from row [" + str(start_row_number) + "] with [" + str(len(orders)) + "] orders")
+        logger.debug("Adding new orders to Google Sheets starting from row [" + str(start_row_number) + "] with [" + str(len(orders) - 1) + "] orders")
 
         try:
             sheet = self.SERVICE.spreadsheets()
@@ -272,22 +276,14 @@ class SheetsOB:
             logger.error(err)
             return None
     
-    def convert_str_to_datetime(self, date_str):
-        """
-        Convert a date string to datetime
-        """
-        if (date_str is None):
-            return None
-        
     def get_no_last_updated(self) -> dict[str, datetime]:
         """
         Get the last updated time from the new orders sheet
         """
+        logger.info("Getting last updated times from Google Sheets")
         
         if (self.NEWORDERS_SHEET_NAME not in self.CACHE or self.CACHE[self.NEWORDERS_SHEET_NAME] is None):
             self.populate_cache(self.NEWORDERS_SHEET_NAME)
-        
-        logger.info("Getting last updated time from Google Sheets")
         
         res = {}
         for row in self.CACHE[self.NEWORDERS_SHEET_NAME]:
@@ -298,7 +294,51 @@ class SheetsOB:
                 if row[0] == "Account" or (len(row) > 1 and row[1] == "Deactivated"):
                     continue
                 
-                res[row[0]] = row[1] if len(row) > 1 else None
+                print (row)
+                res[row[0]] = row[1] if len(row) > 1 and row[1] != '' else None
+    
+    def update_no_last_updated(self, account: str, last_updated: datetime):
+        """
+        Update the last updated time for the account in the New Orders sheet
+        """
+        if (account is None):
+            raise ValueError("Account is required")
+        if (last_updated is None):
+            raise ValueError("Last updated time is required")
+        
+        if (self.NEWORDERS_SHEET_NAME not in self.CACHE or self.CACHE[self.NEWORDERS_SHEET_NAME] is None):
+            self.populate_cache(self.NEWORDERS_SHEET_NAME)
+        
+        logger.info("Updating last updated time for account [" + account + "] to [" + dt_to_str(last_updated) + "]")
+        
+        for idx, row in enumerate(self.CACHE[self.NEWORDERS_SHEET_NAME]):
+            if row is not None and len(row) > 0:
+                if row[0] == self.NO_BREAK_STRING:
+                    raise ValueError("No breaker row found before account [" + account + "] row")
+                
+                if row[0] == "Account" or (len(row) > 1 and row[1] == "Deactivated"):
+                    continue
+                
+                if row[0] == account:
+                    try: 
+                        sheet = self.SERVICE.spreadsheets()
+                        (
+                            sheet.values()
+                            .update(
+                                spreadsheetId=self.ID,
+                                range=self.NEWORDERS_SHEET_NAME + "!B" + str(idx+1),
+                                valueInputOption="USER_ENTERED",
+                                body={"values": [[dt_to_str(last_updated)]]}
+                            )
+                            .execute()
+                        )
+                        logger.debug("Successfully updated last updated time for account [" + account + "]")
+                        return
+                    except HttpError as err:
+                        logger.error(err)
+                        return None
+        
+        raise ValueError("Account [" + account + "] not found in Google Sheets")
     
     def clear_no_from_breaker(self):
         """
@@ -324,8 +364,8 @@ class SheetsOB:
             raise ValueError("Row number is required")
         
         # Get the last column and row
-        last_col = chr(65 + len(self.CACHE[self.NEWORDERS_SHEET_NAME][0]))
         last_row = len(self.CACHE[self.NEWORDERS_SHEET_NAME])
+        last_col = chr(65 + len(self.CACHE[self.NEWORDERS_SHEET_NAME][last_row-1]))
         range = self.NEWORDERS_SHEET_NAME + "!A" + str(row_number) + ":" + last_col + str(last_row)
         
         logger.info("Clearing New Orders sheet cells range [" + range + "]")
@@ -341,3 +381,4 @@ class SheetsOB:
             )
             .execute()
         )
+        

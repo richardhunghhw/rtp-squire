@@ -1,4 +1,4 @@
-import time
+from datetime import datetime as dt
 
 from src.services.exchange import Exchange
 
@@ -14,9 +14,15 @@ def get_exchange_type(account: str, exchanges: dict[str, Exchange]) -> tuple[Exc
             exchange = exchanges[exchange_name]
     return exchange, account.split(" ")[2]
 
-def get_rounded_time() -> int:
+def get_rounded_time() -> dt:
     """
-    Get the current time rounded to the previous quarter hour in epoch time
+    Get the current time rounded to the previous quarter hour
     """
-    current_time = time.time()
-    return (int(current_time - (current_time % 900)) - 900) * 1000
+    current_time = dt.now().timestamp()
+    return dt.fromtimestamp(current_time - (current_time % 900) - 900)
+
+def dt_to_str(dt: dt) -> str:
+    """
+    Convert datetime to string
+    """
+    return dt.strftime("%d/%m/%Y %H:%M:%S")
